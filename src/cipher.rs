@@ -1,8 +1,9 @@
-
-use std::{fs};
+use std::{fs, env::args};
 use md5;
 
 use rand::{self, Rng};
+
+use crate::algs_func;
 
 pub struct Cipher<T> {
     pub mode:String,
@@ -71,7 +72,7 @@ impl Cipher<()> {
     
         let mut result:Vec<&[u8]> = Vec::new();
     
-        for i in 0..=num_of_slices-1 {
+        for i in 0..num_of_slices {
             let slice: &[u8] = &byte_vec[size_of_slices * i .. size_of_slices * (i+1)];
             result.push(slice);
         }
@@ -81,16 +82,27 @@ impl Cipher<()> {
 }
 
 impl Cipher<Vec<u8>> {
-    fn encode(&self) -> String {
-        let encryption: String;
+    pub fn encode(&self) -> String {
+        let mut encryption: String = "".to_string();
+        
+        let key:[u8; 32] = self.password.as_bytes().try_into().expect("Что?");
+        let round_keys = algs_func::generate_round_keys(key);
         match self.mode.as_str() {
+            "ECB" => {
+                for i in 0..(self.encode_struct.len() / 16) {
+                    let data_to_encode:[u8;16] = self.encode_struct[16*i .. 16*(i+1)].to_owned().try_into().unwrap();
+                    let res = algs_func::LSX_encrypt_data(round_keys, data_to_encode);
+                    encryption.push_str(/* std::str::from_utf8(&res).unwrap()) */res.iter().map(|x| format!("{:x}", x)).collect::<Vec<String>>().join("").as_str())
+                }
+                println!("Encrypted message: {} \n IV: {:}== \n", encryption, std::str::from_utf8(&self.iv[..]).unwrap() )//self.iv.iter().map(|i| format!("{:x}", i)).collect::<Vec<String>>().join(""));
+            }
             "CBC" => {
 
             }
             _ => {}
         }
 
-        "123".to_string()
+        encryption
     }
 }
 

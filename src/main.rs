@@ -57,27 +57,27 @@ fn main() {
     let args = Args::parse();
 
     let text = Cipher::read_file_to_string(&args.file_path.as_str());
-    let mut byte_array = Cipher::string_to_bytes(text.as_str());
+    let mut byte_array = Cipher::string_to_bytes(&text.as_str());
     let byte_vec = Cipher::append_zeros_vec(&mut byte_array);
 
-    if args.mode == "CBC" {
+    if args.mode == "ECB" {
         let cipher:Cipher<Vec<u8>> = Cipher {
-            mode: args.mode.to_string(),
+            mode: args.mode.to_owned(),
             bytes_array : byte_vec.to_owned(),
-            encode_struct : Vec::new(),
-            password: args.password,
+            encode_struct : byte_vec.to_owned(),
+            password: Cipher::tokenize_password(args.password),
             iv: Cipher::generate_iv(),
         };
 
+        cipher.encode();
     }
-
-    if args.mode == "CBC" {
-
-    } else {
-        let slices = Cipher::slice_array_by_cpu(&byte_array);
-
-
+    else {
+        let cipher: Cipher<Vec<&[u8]>> = Cipher { 
+            mode: args.mode.to_owned(), 
+            bytes_array: byte_vec.to_owned(), 
+            encode_struct: Cipher::slice_array_by_cpu(&byte_vec), 
+            password: args.password, 
+            iv: Cipher::generate_iv() 
+        };
     }
-
-    println!("{:?}", byte_array);
 }

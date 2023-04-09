@@ -10,3 +10,4 @@ clap = { version = "4.2.1", features = ["derive"] }
 num_cpus = "1"
 md5 = "0.7.0"
 rand = "0.8.5"
+base64 = "0.21.0"
