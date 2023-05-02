@@ -1,4 +1,4 @@
-use std::{fs, env::args};
+use std::{fs};
 use md5;
 
 use rand::{self, Rng};
@@ -9,7 +9,7 @@ pub struct Cipher<T> {
     pub mode:String,
     pub bytes_array: Vec<u8>,
     pub encode_struct:T,
-    pub password:String,
+    pub password: [u8; 16],
     pub iv: Vec<u8>
 }
 /* 
@@ -39,8 +39,14 @@ impl Cipher<()> {
         return str_text;
     } 
 
-    pub fn tokenize_password (password:String) -> String {
-        format!("{:x}", md5::compute(password))
+    pub fn tokenize_password (password:String) -> [u8; 16] {
+        let md_hash = format!("{:?}", md5::compute(&password));
+
+        let mut result:[u8; 16] = [0u8; 16];
+
+        hex::decode_to_slice(md_hash, &mut result).expect("Ошибка в просчёте хэша");
+
+        return result
     }
 
     pub fn generate_iv () -> Vec<u8> {
@@ -85,29 +91,24 @@ impl Cipher<Vec<u8>> {
     pub fn encode(&self) -> String {
         let mut encryption: String = "".to_string();
         
-        let key:[u8; 32] = self.password.as_bytes().try_into().expect("Что?");
+        let key:[u8; 32] = self.password.map(|i| format!("{:02x}", i)).join("").as_bytes().try_into().expect("Неверное количество символов");
+        
         let round_keys = algs_func::generate_round_keys(key);
         match self.mode.as_str() {
             "ECB" => {
                 for i in 0..(self.encode_struct.len() / 16) {
                     let data_to_encode:[u8;16] = self.encode_struct[16*i .. 16*(i+1)].to_owned().try_into().unwrap();
                     let res = algs_func::LSX_encrypt_data(round_keys, data_to_encode);
-                    encryption.push_str(/* std::str::from_utf8(&res).unwrap()) */res.iter().map(|x| format!("{:x}", x)).collect::<Vec<String>>().join("").as_str())
+                    encryption.push_str(res.iter().map(|x| format!("{:x}", x)).collect::<Vec<String>>().join("").as_str())
                 }
                 println!("Encrypted message: {} \n IV: {:}== \n", encryption, std::str::from_utf8(&self.iv[..]).unwrap() )//self.iv.iter().map(|i| format!("{:x}", i)).collect::<Vec<String>>().join(""));
             }
             "CBC" => {
-
+                
             }
             _ => {}
         }
 
         encryption
-    }
-}
-
-impl Cipher<Vec<&[u8]>> {
-    fn encode(&self) -> String {
-        "123".to_string()
     }
 }

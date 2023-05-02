@@ -60,24 +60,14 @@ fn main() {
     let mut byte_array = Cipher::string_to_bytes(&text.as_str());
     let byte_vec = Cipher::append_zeros_vec(&mut byte_array);
 
-    if args.mode == "ECB" {
-        let cipher:Cipher<Vec<u8>> = Cipher {
-            mode: args.mode.to_owned(),
-            bytes_array : byte_vec.to_owned(),
-            encode_struct : byte_vec.to_owned(),
-            password: Cipher::tokenize_password(args.password),
-            iv: Cipher::generate_iv(),
-        };
+    let cipher:Cipher<Vec<u8>> = Cipher {
+        mode: args.mode.to_owned(),
+        bytes_array : byte_vec.to_owned(),
+        encode_struct : byte_vec.to_owned(),
+        password: Cipher::tokenize_password(args.password),
+        iv: Cipher::generate_iv(),
+    };
 
-        cipher.encode();
-    }
-    else {
-        let cipher: Cipher<Vec<&[u8]>> = Cipher { 
-            mode: args.mode.to_owned(), 
-            bytes_array: byte_vec.to_owned(), 
-            encode_struct: Cipher::slice_array_by_cpu(&byte_vec), 
-            password: args.password, 
-            iv: Cipher::generate_iv() 
-        };
-    }
+    cipher.encode();
+
 }
