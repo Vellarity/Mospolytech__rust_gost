@@ -7,8 +7,6 @@ pub mod cipher;
 use clap::Parser;
 use cipher::Cipher;
 
-//use crate::{helpers::{read_file_to_string, string_to_bytes, append_zeros_vec, slice_array_by_cpu}};
-
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
