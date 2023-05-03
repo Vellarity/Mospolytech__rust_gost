@@ -59,6 +59,8 @@ fn main() {
     let byte_vec = Cipher::append_zeros_vec(&mut byte_array);
 
     let cipher:Cipher<Vec<u8>> = Cipher {
+        text: text,
+        pass: args.password.clone(),
         mode: args.mode.to_owned(),
         bytes_array : byte_vec.to_owned(),
         encode_struct : byte_vec.to_owned(),

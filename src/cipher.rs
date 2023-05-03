@@ -5,8 +5,12 @@ use rand::{self, Rng};
 
 use crate::algs_func;
 
+use kuznechik::{KeyStore, Kuznechik, AlgEcb, AlgCbc, AlgCtr};
+
 pub struct Cipher<T> {
     pub mode:String,
+    pub text: String,
+    pub pass: String,
     pub bytes_array: Vec<u8>,
     pub encode_struct:T,
     pub password: [u8; 16],
@@ -50,7 +54,7 @@ impl Cipher<()> {
     }
 
     pub fn generate_iv () -> Vec<u8> {
-        Vec::from(format!("{:x}", md5::compute(rand::thread_rng().gen::<i64>().to_string())).as_bytes())
+        Vec::from(format!("{:x}", md5::compute(rand::thread_rng().gen::<i128>().to_string())).as_bytes())
     }
 
 }
@@ -73,17 +77,80 @@ impl Cipher<Vec<u8>> {
                         encryption_massive.push(res);
                     }
                     println!(
-                        "Encrypted message: {} \n IV: {:} \n Size of message: {:} bytes \n Elapsed real time: {:} ns \n Elapsed clocks: {:} \n", 
-                        encryption_massive.into_iter().flatten().collect::<Vec<u8>>().iter().map(|i| format!("{:x}", i)).collect::<Vec<String>>().join(""),
+                        "IV: {:} \nSize of message: {:} bytes \nElapsed real time: {:} ns \nElapsed clocks: {:} \n", 
                         std::str::from_utf8(&self.iv[..]).unwrap(),
                         self.encode_struct.len(),
                         real_timer.elapsed().as_nanos(), 
                         core::arch::x86_64::_rdtsc() - clock_timer
-                    )
+                    );
+
+                    //println!("Encrypted message: {} \n", encryption_massive.into_iter().flatten().collect::<Vec<u8>>().iter().map(|i| format!("{:x}", i)).collect::<Vec<String>>().join(""),)
                 }; 
             }
-            "CBC" => {
+            "ECB_LIB" => {
+                let kuz = KeyStore::new().password(&self.pass);
+
+                let data = Vec::from(self.text.as_str());
+
+                let real_timer = time::Instant::now();
+                unsafe {
+                    let clock_timer = core::arch::x86_64::_rdtsc();
+                    let cipher = AlgEcb::new(&kuz).encrypt(data);
+
+                    println!(
+                        "Size of message: {:} bytes\n Elapsed real time: {:} ns\n Elapsed clocks: {:} \n", 
+                        self.text.len(),
+                        real_timer.elapsed().as_nanos(), 
+                        core::arch::x86_64::_rdtsc() - clock_timer
+                    );
+                    //println!("Encrypted message: {:#100} \n ", cipher.iter().map(|i| format!("{:x}", i)).collect::<Vec<String>>().join(""))
+                }
                 
+            }
+            "CBC_LIB" => {
+                let kuz = KeyStore::new().password(&self.pass);
+
+                let gamma = self.iv.clone();
+
+                let data = Vec::from(self.text.as_str());
+
+                let real_timer = time::Instant::now();
+                unsafe {
+                    let clock_timer = core::arch::x86_64::_rdtsc();
+                    let cipher = AlgCbc::new(&kuz).gamma(gamma.clone()).encrypt(data);
+
+                    println!(
+                        "Size of message: {:} bytes\n Elapsed real time: {:} ns\n Elapsed clocks: {:} \n", 
+                        self.text.len(),
+                        real_timer.elapsed().as_nanos(), 
+                        core::arch::x86_64::_rdtsc() - clock_timer
+                    );
+
+                    println!("Encrypted message: {:#100} \nIV: {} \n", cipher.iter().map(|i| format!("{:x}", i)).collect::<Vec<String>>().join(""), std::str::from_utf8(&self.iv[..]).unwrap(),)
+                }
+            }
+
+            "CTR_LIB" => {
+                let kuz = KeyStore::new().password(&self.pass);
+
+                let gamma = self.iv.clone();
+
+                let data = Vec::from(self.text.as_str());
+
+                let real_timer = time::Instant::now();
+                unsafe {
+                    let clock_timer = core::arch::x86_64::_rdtsc();
+                    let cipher = AlgCtr::new(&kuz).gamma(gamma.clone()).encrypt(data);
+
+                    println!(
+                        "Size of message: {:} bytes\n Elapsed real time: {:} ns\n Elapsed clocks: {:} \n", 
+                        self.text.len(),
+                        real_timer.elapsed().as_nanos(), 
+                        core::arch::x86_64::_rdtsc() - clock_timer
+                    );
+
+                    println!("Encrypted message: {:#100} \nIV: {} \n", cipher.iter().map(|i| format!("{:x}", i)).collect::<Vec<String>>().join(""), std::str::from_utf8(&self.iv[..]).unwrap(),)
+                }
             }
             _ => {}
         }
