@@ -1,4 +1,4 @@
-use std::{fs, time};
+use std::{fs, time, process::exit};
 use md5;
 
 use rand::{self, Rng};
@@ -6,26 +6,19 @@ use rand::{self, Rng};
 use crate::algs_func;
 
 use kuznechik::{KeyStore, Kuznechik, AlgEcb, AlgCbc, AlgCtr};
+use aes::Aes128;
+use aes::cipher::{ BlockEncrypt, KeyInit, KeyIvInit, generic_array::GenericArray, BlockEncryptMut, StreamCipherCoreWrapper, StreamCipher};
+type Aes128Ctr64LE = ctr::Ctr64LE<aes::Aes128>;
+type Aes128CbcEnc = cbc::Encryptor<aes::Aes128>;
 
-pub struct Cipher<T> {
-    pub mode:String,
-    pub text: String,
-    pub pass: String,
-    pub bytes_array: Vec<u8>,
-    pub encode_struct:T,
-    pub password: [u8; 16],
-    pub iv: Vec<u8>
+
+pub trait Encoder {
+    fn encode(&self) { println!("Empty implementation for all types") }
 }
-/* 
-pub trait BasicFunctions {
 
-    fn encode(&self) -> String {
-        "123".to_string()
-    }
-}
- */
+pub struct BasicFunctions;
 
-impl Cipher<()> {
+impl BasicFunctions {
     pub fn string_to_bytes (input_string:&str) -> Vec<u8> {
         return Vec::from(input_string.as_bytes());
     }
@@ -59,8 +52,18 @@ impl Cipher<()> {
 
 }
 
-impl Cipher<Vec<u8>> {
-    pub fn encode(&self) {
+pub struct GostCipher {
+    pub mode:String,
+    pub text: String,
+    pub pass: String,
+    pub bytes_array: Vec<u8>,
+    pub encode_struct:Vec<u8>,
+    pub password: [u8; 16],
+    pub iv: Vec<u8>,
+}
+
+impl Encoder for GostCipher {
+    fn encode(&self) {
         let mut encryption_massive = vec![];
         
         let key:[u8; 32] = self.password.map(|i| format!("{:02x}", i)).join("").as_bytes().try_into().expect("Неверное количество символов");
@@ -129,7 +132,6 @@ impl Cipher<Vec<u8>> {
                     println!("Encrypted message: {:#100} \nIV: {} \n", cipher.iter().map(|i| format!("{:x}", i)).collect::<Vec<String>>().join(""), std::str::from_utf8(&self.iv[..]).unwrap(),)
                 }
             }
-
             "CTR_LIB" => {
                 let kuz = KeyStore::new().password(&self.pass);
 
@@ -152,8 +154,99 @@ impl Cipher<Vec<u8>> {
                     println!("Encrypted message: {:#100} \nIV: {} \n", cipher.iter().map(|i| format!("{:x}", i)).collect::<Vec<String>>().join(""), std::str::from_utf8(&self.iv[..]).unwrap(),)
                 }
             }
-            _ => {}
+            _ => {
+                println!("Данный режим не поддерживается.");
+                exit(2)
+            }
         }
+    }
+}
 
+pub struct AesCipher {
+    pub mode:String,
+    pub text: String,
+    pub pass: String,
+    pub bytes_array: Vec<u8>,
+    pub encode_struct:Vec<u8>,
+    pub password: [u8; 16],
+    pub iv: Vec<u8>,
+}
+
+impl Encoder for AesCipher {
+    fn encode(&self) {
+        let mut encryption_massive = vec![];
+
+        match self.mode.as_str() {
+            "ECB_LIB" => {
+                let key = GenericArray::from(self.password);
+                let cipher = Aes128::new(&key);
+                let real_timer = time::Instant::now();
+                unsafe {
+                    let clock_timer = core::arch::x86_64::_rdtsc();
+                    for i in 0..(self.encode_struct.len() / 16) {
+                        let data_to_gen:[u8;16] = self.encode_struct[16*i .. 16*(i+1)].to_owned().try_into().unwrap();
+                        let mut data_to_encode = GenericArray::from(data_to_gen);
+                        cipher.encrypt_block(&mut data_to_encode);
+                        encryption_massive.push(data_to_encode);
+                    }
+                    println!(
+                        "IV: {:} \nSize of message: {:} bytes \nElapsed real time: {:} ns \nElapsed clocks: {:} \n", 
+                        std::str::from_utf8(&self.iv[..]).unwrap(),
+                        self.encode_struct.len(),
+                        real_timer.elapsed().as_nanos(), 
+                        core::arch::x86_64::_rdtsc() - clock_timer
+                    );
+                    //println!("Encrypted message: {} \n", encryption_massive.into_iter().flatten().collect::<Vec<u8>>().iter().map(|i| format!("{:x}", i)).collect::<Vec<String>>().join(""),)
+                }; 
+            }
+            "CBC_LIB" => {
+                let key = GenericArray::from(self.password);
+                let iv = [0x24; 16];
+                let mut cipher = Aes128CbcEnc::new(&key, &iv.into());
+                let real_timer = time::Instant::now();
+                unsafe {
+                    let clock_timer = core::arch::x86_64::_rdtsc();
+                    for i in 0..(self.encode_struct.len() / 16) {
+                        let data_to_gen:[u8;16] = self.encode_struct[16*i .. 16*(i+1)].to_owned().try_into().unwrap();
+                        let mut data_to_encode = GenericArray::from(data_to_gen);
+                        cipher.encrypt_block_mut(&mut data_to_encode);
+                    
+                        encryption_massive.push(data_to_encode);
+                    }
+                    println!(
+                        "IV: {:} \nSize of message: {:} bytes \nElapsed real time: {:} ns \nElapsed clocks: {:} \n", 
+                        std::str::from_utf8(&self.iv[..]).unwrap(),
+                        self.encode_struct.len(),
+                        real_timer.elapsed().as_nanos(), 
+                        core::arch::x86_64::_rdtsc() - clock_timer
+                    );
+                }
+            }
+            "CTR_LIB" => {
+                let key = GenericArray::from(self.password);
+                let iv = [0x24; 16];
+                let mut cipher = Aes128Ctr64LE::new(&key, &iv.into());
+                let mut text = self.encode_struct.clone();
+                let real_timer = time::Instant::now();
+                unsafe {
+                    let clock_timer = core::arch::x86_64::_rdtsc();
+                    cipher.apply_keystream(&mut text);
+                    //encryption_massive.push(GenericArray::from(text.as_slice()));
+    
+                    println!(
+                        "IV: {:} \nSize of message: {:} bytes \nElapsed real time: {:} ns \nElapsed clocks: {:} \n", 
+                        std::str::from_utf8(&self.iv[..]).unwrap(),
+                        self.encode_struct.len(),
+                        real_timer.elapsed().as_nanos(), 
+                        core::arch::x86_64::_rdtsc() - clock_timer
+                    );
+                    //println!("Encrypted message: {} \n", encryption_massive.into_iter().flatten().collect::<Vec<u8>>().iter().map(|i| format!("{:x}", i)).collect::<Vec<String>>().join(""),)
+                }; 
+            }
+            _ => {
+                println!("Данный режим не поддерживается.");
+                exit(2)
+            }
+        }
     }
 }

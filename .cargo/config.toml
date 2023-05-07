@@ -1,0 +1,2 @@
+[build]
+rustflags = "--cfg aes_force_soft --cfg aes_compact -Ctarget-feature=-aes,-ssse3"
